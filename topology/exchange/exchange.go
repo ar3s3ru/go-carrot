@@ -6,6 +6,11 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// type Channel interface {
+// 	ExchangeDeclare(name, kind string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) error
+// 	ExchangeBind(name, routingKey, source string, noWait bool, args amqp.Table) error
+// }
+
 type Declarer struct {
 	name string
 	kind kind.Kind
@@ -22,22 +27,14 @@ type Declarer struct {
 	args amqp.Table
 }
 
-func (exchange Declarer) Declare(ch *amqp.Channel) error {
-	err := ch.ExchangeDeclare(
-		exchange.name,
-		string(exchange.kind),
-		exchange.durable, exchange.autoDelete,
-		exchange.exclusive,
-		exchange.noWait,
-		exchange.args,
-	)
-
+func (d Declarer) Declare(ch *amqp.Channel) error {
+	err := ch.ExchangeDeclare(d.name, string(d.kind), d.durable, d.autoDelete, d.exclusive, d.noWait, d.args)
 	if err != nil {
 		return err
 	}
 
-	if exchange.shouldBind {
-		err = ch.ExchangeBind(exchange.name, exchange.routingKey, exchange.source, exchange.noWait, nil)
+	if d.shouldBind {
+		err := ch.ExchangeBind(d.name, d.routingKey, d.source, d.noWait, nil)
 		if err != nil {
 			return err
 		}
@@ -46,12 +43,12 @@ func (exchange Declarer) Declare(ch *amqp.Channel) error {
 	return nil
 }
 
-func (exchange *Declarer) addToTable(key string, value interface{}) {
-	if exchange.args == nil {
-		exchange.args = make(amqp.Table)
+func (d *Declarer) addToTable(key string, value interface{}) {
+	if d.args == nil {
+		d.args = make(amqp.Table)
 	}
 
-	exchange.args[key] = value
+	d.args[key] = value
 }
 
 func Declare(name string, options ...Option) Declarer {

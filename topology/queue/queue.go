@@ -2,6 +2,11 @@ package queue
 
 import "github.com/streadway/amqp"
 
+// type Channel interface {
+// 	QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error)
+// 	QueueBind(name, exchange, routingKey string, noWait bool, args amqp.Table) error
+// }
+
 type Declarer struct {
 	name        string
 	description string
@@ -20,20 +25,20 @@ type Declarer struct {
 	deadLetterQueue *Declarer
 }
 
-func (queue Declarer) Declare(ch *amqp.Channel) error {
-	_, err := ch.QueueDeclare(queue.name, queue.durable, queue.autoDelete, queue.exclusive, queue.noWait, queue.args)
+func (d Declarer) Declare(ch *amqp.Channel) error {
+	_, err := ch.QueueDeclare(d.name, d.durable, d.autoDelete, d.exclusive, d.noWait, d.args)
 	if err != nil {
 		return err
 	}
 
-	if queue.shouldBind {
-		err = ch.QueueBind(queue.name, queue.routingKey, queue.exchange, queue.noWait, nil)
+	if d.shouldBind {
+		err = ch.QueueBind(d.name, d.routingKey, d.exchange, d.noWait, nil)
 		if err != nil {
 			return err
 		}
 	}
 
-	if dlq := queue.deadLetterQueue; dlq != nil {
+	if dlq := d.deadLetterQueue; dlq != nil {
 		err = dlq.Declare(ch)
 		if err != nil {
 			return err
@@ -43,12 +48,12 @@ func (queue Declarer) Declare(ch *amqp.Channel) error {
 	return nil
 }
 
-func (queue *Declarer) addToTable(key string, value interface{}) {
-	if queue.args == nil {
-		queue.args = make(amqp.Table)
+func (d *Declarer) addToTable(key string, value interface{}) {
+	if d.args == nil {
+		d.args = make(amqp.Table)
 	}
 
-	queue.args[key] = value
+	d.args[key] = value
 }
 
 func Declare(name string, options ...Option) Declarer {
