@@ -8,6 +8,6 @@ type Router interface {
 	Group(func(Router)) Router
 }
 
-func NewRouterMux() Router {
+func NewRouter() Router {
 	panic("implement me")
 }
