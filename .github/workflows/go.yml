@@ -3,8 +3,8 @@ on: push
 name: Pipeline
 
 jobs:
-  test:
-    name: Golang 1.13
+  unit-test:
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -25,3 +25,13 @@ jobs:
           file: ./coverage.txt
           flags: unit
           fail_ci_if_error: true
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Run golangci-lint
+        uses: actions-contrib/golangci-lint@v1
