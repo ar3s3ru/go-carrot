@@ -22,6 +22,24 @@ func TestDeclare(t *testing.T) {
 				kind: kind.Topic,
 			},
 		},
+		"nil options are ignored": {
+			name:    "exchange",
+			options: []Option{nil},
+			output: Declarer{
+				name: "exchange",
+				kind: kind.Topic,
+			},
+		},
+		"with different kind than topic": {
+			name: "exchange",
+			options: []Option{
+				Kind(kind.Direct),
+			},
+			output: Declarer{
+				name: "exchange",
+				kind: kind.Direct,
+			},
+		},
 		"turn up all the exchange options": {
 			name: "exchange",
 			options: []Option{

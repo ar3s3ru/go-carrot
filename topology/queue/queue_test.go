@@ -19,6 +19,13 @@ func TestDeclare(t *testing.T) {
 				name: "queue",
 			},
 		},
+		"nil options are ignored": {
+			name:    "queue",
+			options: []Option{nil},
+			output: Declarer{
+				name: "queue",
+			},
+		},
 		"with description": {
 			name: "queue",
 			options: []Option{

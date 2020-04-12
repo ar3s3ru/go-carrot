@@ -14,19 +14,9 @@ type Listener struct {
 	noLocal   bool
 	noWait    bool
 	args      amqp.Table
-
-	useNewChannel bool
 }
 
 func (listener Listener) Listen(conn *amqp.Connection, ch *amqp.Channel) (<-chan amqp.Delivery, error) {
-	var err error
-
-	if listener.useNewChannel {
-		if ch, err = conn.Channel(); err != nil {
-			return nil, err
-		}
-	}
-
 	return ch.Consume(
 		listener.queue,
 		listener.queue,
@@ -36,6 +26,14 @@ func (listener Listener) Listen(conn *amqp.Connection, ch *amqp.Channel) (<-chan
 		listener.noWait,
 		listener.args,
 	)
+}
+
+func (listener *Listener) addToTable(key string, value interface{}) {
+	if listener.args == nil {
+		listener.args = make(amqp.Table)
+	}
+
+	listener.args[key] = value
 }
 
 func Listen(queue string, options ...Option) Listener {
@@ -70,4 +68,10 @@ func NoLocal(listener *Listener) { listener.noLocal = true }
 
 func NoWait(listener *Listener) { listener.noWait = true }
 
-func UseDedicatedChannel(listener *Listener) { listener.useNewChannel = true }
+func Arguments(args amqp.Table) Option {
+	return func(listener *Listener) {
+		for key, value := range args {
+			listener.addToTable(key, value)
+		}
+	}
+}
