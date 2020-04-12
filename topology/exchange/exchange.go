@@ -1,6 +1,7 @@
 package exchange
 
 import (
+	"github.com/ar3s3ru/go-carrot/topology"
 	"github.com/ar3s3ru/go-carrot/topology/exchange/kind"
 
 	"github.com/streadway/amqp"
@@ -20,7 +21,7 @@ type Declarer struct {
 	args amqp.Table
 }
 
-func (d Declarer) Declare(ch *amqp.Channel) error {
+func (d Declarer) Declare(ch topology.Channel) error {
 	err := ch.ExchangeDeclare(d.name, string(d.kind), d.durable, d.autoDelete, d.exclusive, d.noWait, d.args)
 	if err != nil {
 		return err
@@ -40,7 +41,7 @@ type binding struct {
 	routingKey string
 }
 
-func (d Declarer) bindAll(ch *amqp.Channel) error {
+func (d Declarer) bindAll(ch topology.Channel) error {
 	for _, binding := range d.bindings {
 		err := ch.ExchangeBind(d.name, binding.routingKey, binding.exchange, d.noWait, nil)
 		if err != nil {

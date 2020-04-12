@@ -1,6 +1,10 @@
 package queue
 
-import "github.com/streadway/amqp"
+import (
+	"github.com/ar3s3ru/go-carrot/topology"
+
+	"github.com/streadway/amqp"
+)
 
 // type Channel interface {
 // 	QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error)
@@ -23,7 +27,7 @@ type Declarer struct {
 	deadLetterQueue *Declarer
 }
 
-func (d Declarer) Declare(ch *amqp.Channel) error {
+func (d Declarer) Declare(ch topology.Channel) error {
 	_, err := ch.QueueDeclare(d.name, d.durable, d.autoDelete, d.exclusive, d.noWait, d.args)
 	if err != nil {
 		return err
@@ -50,7 +54,7 @@ type binding struct {
 	routingKey string
 }
 
-func (d Declarer) bindAll(ch *amqp.Channel) error {
+func (d Declarer) bindAll(ch topology.Channel) error {
 	for _, binding := range d.bindings {
 		err := ch.QueueBind(d.name, binding.routingKey, binding.exchange, d.noWait, nil)
 		if err != nil {

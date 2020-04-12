@@ -2,8 +2,6 @@ package topology
 
 import (
 	"fmt"
-
-	"github.com/streadway/amqp"
 )
 
 // All declares the whole topology provided in a transaction.
@@ -17,7 +15,7 @@ func All(declarers ...Declarer) Declarer {
 		return nil
 	}
 
-	return declarerFunc(func(ch *amqp.Channel) error {
+	return declarerFunc(func(ch Channel) error {
 		var err error
 
 		if err = ch.Tx(); err != nil {
