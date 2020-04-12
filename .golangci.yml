@@ -1,0 +1,68 @@
+# options for analysis running
+run:
+  modules-download-mode: readonly
+
+linters-settings:
+  funlen:
+    lines: 60
+    statements: 40
+  gocognit:
+    min-complexity: 10
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  gocyclo:
+    min-complexity: 10
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: github.com/ar3s3ru/go-carrot
+  gomnd:
+    settings:
+      mnd:
+        # the list of enabled checks, see https://github.com/tommy-muehle/go-mnd/#checks for description.
+        checks: argument,case,condition,operation,return,assign
+  govet:
+    # report about shadowed variables
+    check-shadowing: true
+    enable-all: true
+  lll:
+    # max line length, lines longer will be reported. Default is 120.
+    # '\t' is counted as 1 character by default, and can be changed with the tab-width option
+    line-length: 120
+    # tab width in spaces. Default to 1.
+    tab-width: 4
+  maligned:
+    # print struct with more effective memory layout or not, false by default
+    suggest-new: true
+  misspell:
+    # Correct spellings using locale preferences for US or UK.
+    # Setting locale to US will correct the British spelling of 'colour' to 'color'.
+    locale: US
+  nakedret:
+    # make an issue if func has more lines of code than this setting and it has naked returns; default is 30
+    max-func-lines: 30
+  prealloc:
+    # Report preallocation suggestions only on simple loops that have no returns/breaks/continues/gotos in them.
+    # True by default.
+    simple: true
+    range-loops: true # Report preallocation suggestions on range loops, true by default
+    for-loops: false # Report preallocation suggestions on for loops, false by default
+  unparam:
+    # Inspect exported functions, default is false. Set to true if no external program/library imports your code.
+    # XXX: if you enable this setting, unparam will report a lot of false-positives in text editors:
+    # if it's called for subdir of a project it can't find external interfaces. All text editor integrations
+    # with golangci-lint call it on a directory with the changed file.
+    check-exported: false
+  whitespace:
+    multi-if: true
+    multi-func: true
+
+issues:
+  # Show only new issues: if there are unstaged changes or untracked files,
+  # only those changes are analyzed, else only changes in HEAD~ are analyzed.
+  # It's a super-useful option for integration of golangci-lint into existing
+  # large codebase. It's not practical to fix all existing issues at the moment
+  # of integration: much better don't allow issues in new code.
+  # Default is false.
+  new: true
