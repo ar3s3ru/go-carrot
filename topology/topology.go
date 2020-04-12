@@ -1,35 +1,19 @@
 package topology
 
 import (
-	"fmt"
-
 	"github.com/streadway/amqp"
 )
 
+// Declarer is a component able to declare a topology, given an AMQP channel
+// to communicate with the AMQP broker.
+//
+// Declarer is a fallible operation, since it communicates with the external
+// broker, so it may return an error.
 type Declarer interface {
 	Declare(*amqp.Channel) error
 }
 
+// NOTE: not sure if this type should be exported...
 type declarerFunc func(*amqp.Channel) error
 
 func (df declarerFunc) Declare(ch *amqp.Channel) error { return df(ch) }
-
-func All(declarers ...Declarer) Declarer {
-	return declarerFunc(func(ch *amqp.Channel) error {
-		if len(declarers) == 0 {
-			return nil
-		}
-
-		for _, declarer := range declarers {
-			if declarer == nil {
-				continue
-			}
-
-			if err := declarer.Declare(ch); err != nil {
-				return fmt.Errorf("topology.All: failed to declare topology, %w", err)
-			}
-		}
-
-		return nil
-	})
-}
