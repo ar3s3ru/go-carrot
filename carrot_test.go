@@ -1,20 +1,25 @@
 package carrot_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ar3s3ru/go-carrot"
-	"github.com/ar3s3ru/go-carrot/consumer"
-	"github.com/ar3s3ru/go-carrot/consumer/middleware"
+	"github.com/ar3s3ru/go-carrot/binder/consumer"
+	"github.com/ar3s3ru/go-carrot/handler"
+	"github.com/ar3s3ru/go-carrot/handler/router"
+	"github.com/ar3s3ru/go-carrot/handler/router/middleware"
 	"github.com/ar3s3ru/go-carrot/topology"
 	"github.com/ar3s3ru/go-carrot/topology/exchange"
 	"github.com/ar3s3ru/go-carrot/topology/exchange/kind"
 	"github.com/ar3s3ru/go-carrot/topology/queue"
+
+	"github.com/streadway/amqp"
 )
 
 func TestFrom(t *testing.T) {
-	carrot.From(nil).
-		WithTopology(topology.All(
+	carrot.From(nil,
+		carrot.WithTopology(topology.All(
 			exchange.Declare("orders",
 				exchange.Kind(kind.Topic),
 				exchange.Durable,
@@ -45,14 +50,17 @@ func TestFrom(t *testing.T) {
 					queue.Declare("my-service.order.finalized.failed"),
 				),
 			),
-		)).
-		WithConsumers(consumer.NewRouter().Group(func(r consumer.Router) {
+		)),
+		carrot.WithBinder(consumer.Bind(
+			"my-service.order.invalidate",
+			consumer.Title("Invalidate Order"),
+		)),
+		carrot.WithHandler(router.New().Group(func(r router.Router) {
 			r.Use(middleware.SessionPerRequest(nil))
 
-			r.Register(nil, consumer.Binding{
-				Title: "Invalidate Orders",
-				Queue: "my-service.order.invalidate",
-			})
-		})).
-		Start()
+			r.Bind("my-service.order.invalidate", handler.Func(func(context.Context, amqp.Delivery) error {
+				return nil
+			}))
+		})),
+	).Run()
 }
