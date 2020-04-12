@@ -1,4 +1,4 @@
-package carrot
+package handler
 
 import (
 	"context"
@@ -10,8 +10,8 @@ type Handler interface {
 	Handle(context.Context, amqp.Delivery) error
 }
 
-type HandlerFunc func(context.Context, amqp.Delivery) error
+type Func func(context.Context, amqp.Delivery) error
 
-func (fn HandlerFunc) Handle(ctx context.Context, delivery amqp.Delivery) error {
+func (fn Func) Handle(ctx context.Context, delivery amqp.Delivery) error {
 	return fn(ctx, delivery)
 }

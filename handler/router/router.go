@@ -3,17 +3,18 @@ package router
 import (
 	"context"
 
-	"github.com/ar3s3ru/go-carrot"
+	"github.com/ar3s3ru/go-carrot/handler"
+
 	"github.com/streadway/amqp"
 )
 
 type Router interface {
-	carrot.Handler
+	handler.Handler
 
-	Bind(string, carrot.Handler)
+	Bind(string, handler.Handler)
 
-	Use(middlewares ...func(carrot.Handler) carrot.Handler)
-	With(middlewares ...func(carrot.Handler) carrot.Handler) Router
+	Use(middlewares ...func(handler.Handler) handler.Handler)
+	With(middlewares ...func(handler.Handler) handler.Handler) Router
 	Group(func(Router)) Router
 }
 
@@ -22,8 +23,8 @@ func New() *Mux {
 }
 
 type Mux struct {
-	middlewares []func(carrot.Handler) carrot.Handler
-	consumers   map[string]carrot.Handler
+	middlewares []func(handler.Handler) handler.Handler
+	consumers   map[string]handler.Handler
 }
 
 func (r Mux) Handle(ctx context.Context, delivery amqp.Delivery) error {
@@ -42,23 +43,23 @@ func (r Mux) Handle(ctx context.Context, delivery amqp.Delivery) error {
 	return err
 }
 
-func (r *Mux) Bind(queue string, handler carrot.Handler) {
-	if handler == nil {
+func (r *Mux) Bind(queue string, h handler.Handler) {
+	if h == nil {
 		return
 	}
 
 	if r.consumers == nil {
-		r.consumers = make(map[string]carrot.Handler)
+		r.consumers = make(map[string]handler.Handler)
 	}
 
-	r.consumers[queue] = handler
+	r.consumers[queue] = h
 }
 
-func (r *Mux) Use(middlewares ...func(carrot.Handler) carrot.Handler) {
+func (r *Mux) Use(middlewares ...func(handler.Handler) handler.Handler) {
 	r.middlewares = append(r.middlewares, middlewares...)
 }
 
-func (r Mux) With(middlewares ...func(carrot.Handler) carrot.Handler) Router {
+func (r Mux) With(middlewares ...func(handler.Handler) handler.Handler) Router {
 	newRouter := Mux{consumers: r.consumers}
 	newRouter.middlewares = append(r.middlewares, middlewares...)
 
@@ -75,7 +76,7 @@ func (r *Mux) Group(fn func(Router)) Router {
 	return newRouter
 }
 
-func (r Mux) applyMiddlewares(handler carrot.Handler) carrot.Handler {
+func (r Mux) applyMiddlewares(handler handler.Handler) handler.Handler {
 	for i := len(r.middlewares) - 1; i >= 0; i-- {
 		middleware := r.middlewares[i]
 		handler = middleware(handler)
