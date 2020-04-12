@@ -1,4 +1,4 @@
-package binder
+package listener
 
 import (
 	"fmt"
@@ -7,28 +7,18 @@ import (
 	"github.com/streadway/amqp"
 )
 
-type Binder interface {
-	Bind(*amqp.Connection, *amqp.Channel) (<-chan amqp.Delivery, error)
-}
-
-type Func func(*amqp.Connection, *amqp.Channel) (<-chan amqp.Delivery, error)
-
-func (fn Func) Bind(conn *amqp.Connection, ch *amqp.Channel) (<-chan amqp.Delivery, error) {
-	return fn(conn, ch)
-}
-
-func All(binders ...Binder) Binder {
-	if len(binders) == 0 {
+func Sink(listeners ...Listener) Listener {
+	if len(listeners) == 0 {
 		return nil
 	}
 
 	return Func(func(conn *amqp.Connection, ch *amqp.Channel) (<-chan amqp.Delivery, error) {
-		deliveries := make([]<-chan amqp.Delivery, 0, len(binders))
+		deliveries := make([]<-chan amqp.Delivery, 0, len(listeners))
 
-		for _, binder := range binders {
-			delivery, err := binder.Bind(conn, ch)
+		for _, listener := range listeners {
+			delivery, err := listener.Listen(conn, ch)
 			if err != nil {
-				return nil, fmt.Errorf("binder.All: failed to bind, %w", err)
+				return nil, fmt.Errorf("listener.Sink: failed to listen, %w", err)
 			}
 
 			deliveries = append(deliveries, delivery)
@@ -37,7 +27,7 @@ func All(binders ...Binder) Binder {
 		wg := new(sync.WaitGroup)
 		wg.Add(len(deliveries))
 
-		sink := make(chan amqp.Delivery)
+		sink := make(chan amqp.Delivery, 1)
 		for _, delivery := range deliveries {
 			go sinkFromSource(wg, sink, delivery)
 		}
@@ -53,6 +43,7 @@ func All(binders ...Binder) Binder {
 
 func sinkFromSource(wg *sync.WaitGroup, sink chan<- amqp.Delivery, source <-chan amqp.Delivery) {
 	for delivery := range source {
+		fmt.Println("sinking delivery from", delivery.ConsumerTag)
 		sink <- delivery
 	}
 

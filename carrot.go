@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ar3s3ru/go-carrot/binder"
 	"github.com/ar3s3ru/go-carrot/handler"
+	"github.com/ar3s3ru/go-carrot/listener"
 	"github.com/ar3s3ru/go-carrot/topology"
 
 	"github.com/streadway/amqp"
@@ -20,10 +20,10 @@ var ErrNoConnection = errors.New("carrot: no connection provided")
 // so that Runner.Run can't handle any incoming messages.
 var ErrNoHandler = errors.New("carrot: no handler specified")
 
-// ErrNoBinder is returned by Runner.Run when no delivery binder
+// ErrNoListener is returned by Runner.Run when no delivery listener
 // has been specified, so that Runner.Run can't receive any messages
 // from the AMQP broker.
-var ErrNoBinder = errors.New("carrot: no consumer binder specified")
+var ErrNoListener = errors.New("carrot: no listener specified")
 
 // Runner instruments all the different parts of the go-carrot library,
 // provided with a valid AMQP connection.
@@ -31,13 +31,13 @@ type Runner struct {
 	conn     *amqp.Connection
 	declarer topology.Declarer
 	handler  handler.Handler
-	binder   binder.Binder
+	listener listener.Listener
 }
 
 // Run starts all the different parts of the Runner instrumentator,
-// in the following order: topology declaration, delivery binder and messages listener.
+// in the following order: topology declaration, delivery listener and messages listener.
 //
-// Message listener uses the sink channel coming from the delivery binder,
+// Message listener uses the sink channel coming from the delivery listener,
 // and spawns a separate worker goroutine to run the message handler
 // specified during configuration with the new amqp.Delivery received.
 //
@@ -59,9 +59,9 @@ func (runner Runner) Run() error {
 		}
 	}
 
-	// No handler nor delivery binder is an acceptable scenario: it means
+	// No handler nor delivery listener is an acceptable scenario: it means
 	// the user is not leveraging carrot for message consumption.
-	if runner.handler == nil && runner.binder == nil {
+	if runner.handler == nil && runner.listener == nil {
 		return nil
 	}
 
@@ -69,13 +69,13 @@ func (runner Runner) Run() error {
 		return ErrNoHandler
 	}
 
-	if runner.binder == nil {
-		return ErrNoBinder
+	if runner.listener == nil {
+		return ErrNoListener
 	}
 
-	rx, err := runner.binder.Bind(runner.conn, ch)
+	rx, err := runner.listener.Listen(runner.conn, ch)
 	if err != nil {
-		return fmt.Errorf("carrot: failed to bind, %w", err)
+		return fmt.Errorf("carrot: failed to listen, %w", err)
 	}
 
 	go func(rx <-chan amqp.Delivery) {
@@ -89,7 +89,7 @@ func (runner Runner) Run() error {
 
 // From creates a new Runner instance, given an AMQP connection and options.
 //
-// Required options are WithBinder, to bind a channel to an amqp.Delivery sink
+// Required options are WithListener, to bind a channel to an amqp.Delivery sink
 // and start receiving messages, and WithHandler, to handle all the incoming
 // messages.
 func From(conn *amqp.Connection, options ...Option) Runner {
@@ -120,8 +120,8 @@ func WithHandler(handler handler.Handler) Option {
 	return func(runner *Runner) { runner.handler = handler }
 }
 
-// WithBinder specifies the component in charge of start listening messages
+// WithListener specifies the component in charge of start listening messages
 // coming from the AMQP broker.
-func WithBinder(binder binder.Binder) Option {
-	return func(runner *Runner) { runner.binder = binder }
+func WithListener(listener listener.Listener) Option {
+	return func(runner *Runner) { runner.listener = listener }
 }

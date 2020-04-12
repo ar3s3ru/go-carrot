@@ -3,10 +3,10 @@ package carrot
 import (
 	"context"
 
-	"github.com/ar3s3ru/go-carrot/binder/consumer"
 	"github.com/ar3s3ru/go-carrot/handler"
 	"github.com/ar3s3ru/go-carrot/handler/router"
 	"github.com/ar3s3ru/go-carrot/handler/router/middleware"
+	"github.com/ar3s3ru/go-carrot/listener/consumer"
 	"github.com/ar3s3ru/go-carrot/topology"
 	"github.com/ar3s3ru/go-carrot/topology/exchange"
 	"github.com/ar3s3ru/go-carrot/topology/exchange/kind"
@@ -49,7 +49,7 @@ func ExampleFrom() {
 				),
 			),
 		)),
-		WithBinder(consumer.Bind(
+		WithListener(consumer.Listen(
 			"my-service.order.invalidate",
 			consumer.Title("Invalidate Order"),
 		)),
