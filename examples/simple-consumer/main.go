@@ -55,11 +55,10 @@ func main() {
 			),
 		)),
 		carrot.WithListener(listener.Sink(
-			consumer.Listen(
+			listener.UseDedicatedChannel(consumer.Listen(
 				"consumer.message.received",
 				consumer.Title("Message received"),
-				consumer.UseDedicatedChannel,
-			),
+			)),
 			consumer.Listen(
 				"consumer.message.deleted",
 				consumer.Title("Message deleted"),
