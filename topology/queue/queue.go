@@ -11,9 +11,7 @@ type Declarer struct {
 	name        string
 	description string
 
-	exchange   string
-	routingKey string
-	shouldBind bool
+	bindings []binding
 
 	durable    bool
 	autoDelete bool
@@ -31,15 +29,30 @@ func (d Declarer) Declare(ch *amqp.Channel) error {
 		return err
 	}
 
-	if d.shouldBind {
-		err = ch.QueueBind(d.name, d.routingKey, d.exchange, d.noWait, nil)
-		if err != nil {
+	if len(d.bindings) > 0 {
+		if err := d.bindAll(ch); err != nil {
 			return err
 		}
 	}
 
 	if dlq := d.deadLetterQueue; dlq != nil {
 		err = dlq.Declare(ch)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type binding struct {
+	exchange   string
+	routingKey string
+}
+
+func (d Declarer) bindAll(ch *amqp.Channel) error {
+	for _, binding := range d.bindings {
+		err := ch.QueueBind(d.name, binding.routingKey, binding.exchange, d.noWait, nil)
 		if err != nil {
 			return err
 		}
@@ -78,9 +91,10 @@ func Description(desc string) Option {
 
 func BindTo(exchange, routingKey string) Option {
 	return func(queue *Declarer) {
-		queue.exchange = exchange
-		queue.routingKey = routingKey
-		queue.shouldBind = true
+		queue.bindings = append(queue.bindings, binding{
+			exchange:   exchange,
+			routingKey: routingKey,
+		})
 	}
 }
 

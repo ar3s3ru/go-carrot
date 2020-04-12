@@ -6,18 +6,11 @@ import (
 	"github.com/streadway/amqp"
 )
 
-// type Channel interface {
-// 	ExchangeDeclare(name, kind string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) error
-// 	ExchangeBind(name, routingKey, source string, noWait bool, args amqp.Table) error
-// }
-
 type Declarer struct {
 	name string
 	kind kind.Kind
 
-	source     string
-	routingKey string
-	shouldBind bool
+	bindings []binding
 
 	durable    bool
 	autoDelete bool
@@ -33,8 +26,23 @@ func (d Declarer) Declare(ch *amqp.Channel) error {
 		return err
 	}
 
-	if d.shouldBind {
-		err := ch.ExchangeBind(d.name, d.routingKey, d.source, d.noWait, nil)
+	if len(d.bindings) > 0 {
+		if err := d.bindAll(ch); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type binding struct {
+	exchange   string
+	routingKey string
+}
+
+func (d Declarer) bindAll(ch *amqp.Channel) error {
+	for _, binding := range d.bindings {
+		err := ch.ExchangeBind(d.name, binding.routingKey, binding.exchange, d.noWait, nil)
 		if err != nil {
 			return err
 		}
@@ -69,9 +77,10 @@ type Option func(*Declarer)
 
 func BindTo(source, routingKey string) Option {
 	return func(exchange *Declarer) {
-		exchange.source = source
-		exchange.routingKey = routingKey
-		exchange.shouldBind = true
+		exchange.bindings = append(exchange.bindings, binding{
+			exchange:   source,
+			routingKey: routingKey,
+		})
 	}
 }
 

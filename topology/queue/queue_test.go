@@ -35,10 +35,28 @@ func TestDeclare(t *testing.T) {
 				BindTo("exchange", "routingKey"),
 			},
 			output: Declarer{
-				name:       "queue",
-				exchange:   "exchange",
-				routingKey: "routingKey",
-				shouldBind: true,
+				name: "queue",
+				bindings: []binding{{
+					exchange:   "exchange",
+					routingKey: "routingKey",
+				}},
+			},
+		},
+		"multiple bindings": {
+			name: "queue",
+			options: []Option{
+				BindTo("exchange", "routingKey"),
+				BindTo("exchange2", "routingKey"),
+			},
+			output: Declarer{
+				name: "queue",
+				bindings: []binding{{
+					exchange:   "exchange",
+					routingKey: "routingKey",
+				}, {
+					exchange:   "exchange2",
+					routingKey: "routingKey",
+				}},
 			},
 		},
 		"turn up all the queue options": {
@@ -101,10 +119,11 @@ func TestDeclare(t *testing.T) {
 					"x-dead-letter-routing-key": "routingKey",
 				},
 				deadLetterQueue: &Declarer{
-					name:       "dead-letter-queue",
-					exchange:   "exchange",
-					routingKey: "routingKey",
-					shouldBind: true,
+					name: "dead-letter-queue",
+					bindings: []binding{{
+						exchange:   "exchange",
+						routingKey: "routingKey",
+					}},
 				},
 			},
 		},

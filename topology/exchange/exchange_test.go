@@ -62,11 +62,30 @@ func TestDeclare(t *testing.T) {
 				BindTo("source", "routingKey"),
 			},
 			output: Declarer{
-				name:       "exchange",
-				kind:       kind.Topic,
-				source:     "source",
-				routingKey: "routingKey",
-				shouldBind: true,
+				name: "exchange",
+				kind: kind.Topic,
+				bindings: []binding{{
+					exchange:   "source",
+					routingKey: "routingKey",
+				}},
+			},
+		},
+		"multiple bindings": {
+			name: "exchange",
+			options: []Option{
+				BindTo("source", "routingKey"),
+				BindTo("source2", "routingKey"),
+			},
+			output: Declarer{
+				name: "exchange",
+				kind: kind.Topic,
+				bindings: []binding{{
+					exchange:   "source",
+					routingKey: "routingKey",
+				}, {
+					exchange:   "source2",
+					routingKey: "routingKey",
+				}},
 			},
 		},
 	}
