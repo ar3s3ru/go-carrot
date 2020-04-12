@@ -33,14 +33,13 @@ func (r Mux) Handle(ctx context.Context, delivery amqp.Delivery) error {
 		return delivery.Nack(false, true)
 	}
 
-	err := handler.Handle(ctx, delivery)
+	err := r.applyMiddlewaresTo(handler).Handle(ctx, delivery)
 	if err != nil {
 		delivery.Nack(false, true)
-	} else {
-		delivery.Ack(true)
+		return err
 	}
 
-	return err
+	return delivery.Ack(true)
 }
 
 func (r *Mux) Bind(queue string, h handler.Handler) {
@@ -76,7 +75,7 @@ func (r *Mux) Group(fn func(Router)) Router {
 	return newRouter
 }
 
-func (r Mux) applyMiddlewares(handler handler.Handler) handler.Handler {
+func (r Mux) applyMiddlewaresTo(handler handler.Handler) handler.Handler {
 	for i := len(r.middlewares) - 1; i >= 0; i-- {
 		middleware := r.middlewares[i]
 		handler = middleware(handler)
