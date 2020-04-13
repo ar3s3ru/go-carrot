@@ -43,7 +43,7 @@ func main() {
 	start := time.Now()
 	logger.Println("Starting consumers...")
 
-	mustNotFail(carrot.From(conn,
+	closer, err := carrot.From(conn,
 		carrot.WithTopology(topology.All(
 			exchange.Declare("messages"),
 			queue.Declare("consumer.message.received",
@@ -55,15 +55,25 @@ func main() {
 			),
 		)),
 		carrot.WithListener(listener.Sink(
-			listener.UseDedicatedChannel(consumer.Listen(
+			consumer.Listen(
 				"consumer.message.received",
 				consumer.Title("Message received"),
-			)),
+			),
 			consumer.Listen(
 				"consumer.message.deleted",
 				consumer.Title("Message deleted"),
 			),
 		)),
+		// carrot.WithListener(listener.Sink(
+		// 	listener.UseDedicatedChannel(consumer.Listen(
+		// 		"consumer.message.received",
+		// 		consumer.Title("Message received"),
+		// 	)),
+		// 	listener.UseDedicatedChannel(consumer.Listen(
+		// 		"consumer.message.deleted",
+		// 		consumer.Title("Message deleted"),
+		// 	)),
+		// )),
 		carrot.WithHandler(router.New().Group(func(r router.Router) {
 			r.Use(LogMessages(logger))
 			r.Use(middleware.Timeout(50 * time.Millisecond))
@@ -72,10 +82,16 @@ func main() {
 			r.Bind("consumer.message.received", handler.Func(Acknowledger))
 			r.Bind("consumer.message.deleted", handler.Func(Acknowledger))
 		})),
-	).Run(), logger)
+	).Run()
 
-	<-time.After(config.App.Wait)
-	logger.Printf("Stopping consumer after %s. See ya!\n", time.Since(start))
+	mustNotFail(err, logger)
+
+	select {
+	case <-time.After(config.App.Wait):
+		logger.Printf("Stopping consumer after %s. See ya!\n", time.Since(start))
+	}
+
+	logger.Printf("Stopping consumer after error: %s\n", <-closer.Close())
 }
 
 func SimulateWork(max time.Duration, logger *log.Logger) func(handler.Handler) handler.Handler {

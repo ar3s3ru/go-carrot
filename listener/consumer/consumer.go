@@ -1,6 +1,12 @@
 package consumer
 
 import (
+	"context"
+	"fmt"
+
+	"github.com/ar3s3ru/go-carrot/handler"
+	"github.com/ar3s3ru/go-carrot/listener"
+
 	"github.com/streadway/amqp"
 )
 
@@ -16,24 +22,52 @@ type Listener struct {
 	args      amqp.Table
 }
 
-func (listener Listener) Listen(conn *amqp.Connection, ch *amqp.Channel) (<-chan amqp.Delivery, error) {
-	return ch.Consume(
-		listener.queue,
-		listener.queue,
-		listener.autoAck,
-		listener.exclusive,
-		listener.noLocal,
-		listener.noWait,
-		listener.args,
-	)
-}
-
-func (listener *Listener) addToTable(key string, value interface{}) {
-	if listener.args == nil {
-		listener.args = make(amqp.Table)
+func (l Listener) Listen(conn listener.Connection, ch listener.Channel, h handler.Handler) (listener.Closer, error) {
+	delivery, err := ch.Consume(l.queue, l.queue, l.autoAck, l.exclusive, l.noLocal, l.noWait, l.args)
+	if err != nil {
+		return nil, fmt.Errorf("consumer.Listener: failed to start consuming messages, %w", err)
 	}
 
-	listener.args[key] = value
+	runner := runner{
+		conn:  conn,
+		ch:    ch,
+		sink:  delivery,
+		close: make(chan error),
+	}
+
+	go runner.serve(h)
+
+	return &runner, nil
+}
+
+func (l *Listener) addToTable(key string, value interface{}) {
+	if l.args == nil {
+		l.args = make(amqp.Table)
+	}
+
+	l.args[key] = value
+}
+
+type runner struct {
+	conn  listener.Connection
+	ch    listener.Channel
+	sink  <-chan amqp.Delivery
+	close chan error
+}
+
+func (r *runner) Close() <-chan error {
+	go func() {
+		defer close(r.close)
+		r.close <- r.ch.Close()
+	}()
+
+	return r.close
+}
+
+func (r *runner) serve(h handler.Handler) {
+	for delivery := range r.sink {
+		h.Handle(context.Background(), delivery)
+	}
 }
 
 func Listen(queue string, options ...Option) Listener {

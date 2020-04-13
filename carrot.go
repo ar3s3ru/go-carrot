@@ -1,7 +1,6 @@
 package carrot
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -25,6 +24,20 @@ var ErrNoHandler = errors.New("carrot: no handler specified")
 // from the AMQP broker.
 var ErrNoListener = errors.New("carrot: no listener specified")
 
+// Closer allows to close the amqp.Connection provided and
+// any active Listener after Runner.Run has called.
+type Closer struct {
+	conn   *amqp.Connection
+	closer listener.Closer
+}
+
+// Close closes both the amqp.Connection provided and the Listener
+// declared in the Runner.
+func (closer Closer) Close() <-chan error {
+	defer closer.conn.Close()
+	return closer.closer.Close()
+}
+
 // Runner instruments all the different parts of the go-carrot library,
 // provided with a valid AMQP connection.
 type Runner struct {
@@ -43,30 +56,38 @@ type Runner struct {
 //
 // An error is returned if the supplied parameters during configuration are not
 // valid, or if something happened on the AMQP connection.
-func (runner Runner) Run() error {
+func (runner Runner) Run() (Closer, error) {
 	if runner.conn == nil {
-		return ErrNoConnection
+		return Closer{}, ErrNoConnection
 	}
 
 	if runner.declarer != nil {
 		if err := runner.declareTopology(); err != nil {
-			return fmt.Errorf("carrot: failed to declare topology, %w", err)
+			return Closer{}, fmt.Errorf("carrot: failed to declare topology, %w", err)
 		}
 	}
 
 	// No handler nor delivery listener is an acceptable scenario: it means
 	// the user is not leveraging carrot for message consumption.
 	if runner.handler == nil && runner.listener == nil {
-		return nil
+		return Closer{}, nil
 	}
 
-	return runner.listenAndServe()
+	closer, err := runner.listenAndServe()
+	if err != nil {
+		return Closer{}, fmt.Errorf("carrot: failed to listen and serve consumers, %w", err)
+	}
+
+	return Closer{
+		conn:   runner.conn,
+		closer: closer,
+	}, nil
 }
 
 func (runner Runner) declareTopology() error {
-	ch, err := runner.conn.Channel()
+	ch, err := runner.openChannel()
 	if err != nil {
-		return fmt.Errorf("carrot: failed to create channel from connection, %w", err)
+		return err
 	}
 
 	defer ch.Close()
@@ -74,34 +95,35 @@ func (runner Runner) declareTopology() error {
 	return runner.declarer.Declare(ch)
 }
 
-func (runner Runner) listenAndServe() error {
+func (runner Runner) listenAndServe() (listener.Closer, error) {
 	if runner.handler == nil {
-		return ErrNoHandler
+		return nil, ErrNoHandler
 	}
 
 	if runner.listener == nil {
-		return ErrNoListener
+		return nil, ErrNoListener
 	}
 
+	ch, err := runner.openChannel()
+	if err != nil {
+		return nil, err
+	}
+
+	closer, err := runner.listener.Listen(runner.conn, ch, runner.handler)
+	if err != nil {
+		return nil, fmt.Errorf("carrot: failed to listen, %w", err)
+	}
+
+	return closer, nil
+}
+
+func (runner Runner) openChannel() (*amqp.Channel, error) {
 	ch, err := runner.conn.Channel()
 	if err != nil {
-		return fmt.Errorf("carrot: failed to create channel from connection, %w", err)
+		return nil, fmt.Errorf("carrot: failed to create channel from connection, %w", err)
 	}
 
-	rx, err := runner.listener.Listen(runner.conn, ch)
-	if err != nil {
-		return fmt.Errorf("carrot: failed to listen, %w", err)
-	}
-
-	go func(rx <-chan amqp.Delivery) {
-		for delivery := range rx {
-			go func(delivery amqp.Delivery) {
-				runner.handler.Handle(context.Background(), delivery)
-			}(delivery)
-		}
-	}(rx)
-
-	return runner.declarer.Declare(ch)
+	return ch, nil
 }
 
 // From creates a new Runner instance, given an AMQP connection and options.
