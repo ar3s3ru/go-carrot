@@ -46,7 +46,7 @@ func (r Mux) Handle(ctx context.Context, delivery amqp.Delivery) error {
 		return err
 	}
 
-	return delivery.Ack(true)
+	return delivery.Ack(false)
 }
 
 // Bind binds a message handler function to the specified queue, if the
