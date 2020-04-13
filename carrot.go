@@ -48,13 +48,8 @@ func (runner Runner) Run() error {
 		return ErrNoConnection
 	}
 
-	ch, err := runner.conn.Channel()
-	if err != nil {
-		return fmt.Errorf("carrot: failed to create channel from connection, %w", err)
-	}
-
 	if runner.declarer != nil {
-		if err := runner.declarer.Declare(ch); err != nil {
+		if err := runner.declareTopology(); err != nil {
 			return fmt.Errorf("carrot: failed to declare topology, %w", err)
 		}
 	}
@@ -65,12 +60,32 @@ func (runner Runner) Run() error {
 		return nil
 	}
 
+	return runner.listenAndServe()
+}
+
+func (runner Runner) declareTopology() error {
+	ch, err := runner.conn.Channel()
+	if err != nil {
+		return fmt.Errorf("carrot: failed to create channel from connection, %w", err)
+	}
+
+	defer ch.Close()
+
+	return runner.declarer.Declare(ch)
+}
+
+func (runner Runner) listenAndServe() error {
 	if runner.handler == nil {
 		return ErrNoHandler
 	}
 
 	if runner.listener == nil {
 		return ErrNoListener
+	}
+
+	ch, err := runner.conn.Channel()
+	if err != nil {
+		return fmt.Errorf("carrot: failed to create channel from connection, %w", err)
 	}
 
 	rx, err := runner.listener.Listen(runner.conn, ch)
@@ -80,11 +95,13 @@ func (runner Runner) Run() error {
 
 	go func(rx <-chan amqp.Delivery) {
 		for delivery := range rx {
-			go func(delivery amqp.Delivery) { runner.handler.Handle(context.Background(), delivery) }(delivery)
+			go func(delivery amqp.Delivery) {
+				runner.handler.Handle(context.Background(), delivery)
+			}(delivery)
 		}
 	}(rx)
 
-	return nil
+	return runner.declarer.Declare(ch)
 }
 
 // From creates a new Runner instance, given an AMQP connection and options.
