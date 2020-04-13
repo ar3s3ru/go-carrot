@@ -43,10 +43,8 @@ func (sinker *sinker) Close() <-chan error {
 		go func(closer Closer) {
 			defer sinker.Done()
 
-			select {
-			case err := <-closer.Close():
-				sinker.sink <- err
-			}
+			err := <-closer.Close()
+			sinker.sink <- err
 		}(closer)
 	}
 

@@ -34,7 +34,7 @@ func (d Declarer) Declare(ch topology.Channel) error {
 	}
 
 	if len(d.bindings) > 0 {
-		if err := d.bindAll(ch); err != nil {
+		if err = d.bindAll(ch); err != nil {
 			return err
 		}
 	}
