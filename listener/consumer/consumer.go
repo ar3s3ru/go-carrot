@@ -39,16 +39,14 @@ func (l Listener) Listen(conn listener.Connection, ch listener.Channel, h handle
 		return nil, fmt.Errorf("consumer.Listener: failed to start consuming messages, %w", err)
 	}
 
-	srv := server{
-		conn:  conn,
-		ch:    ch,
-		sink:  delivery,
-		close: make(chan error),
-	}
+	l.server.conn = conn
+	l.server.ch = ch
+	l.server.sink = delivery
+	l.server.close = make(chan error)
 
-	go srv.serve(h)
+	go l.serve(h)
 
-	return &srv, nil
+	return &l, nil
 }
 
 func (l *Listener) addToTable(key string, value interface{}) {
@@ -112,4 +110,21 @@ func Arguments(args amqp.Table) Option {
 			listener.addToTable(key, value)
 		}
 	}
+}
+
+// OnSuccess specifies the callback function to execute when the message handler
+// successfully processed the message (i.e. failed without an error).
+//
+// If not specified, the Server will call amqp.Delivery.Ack(false).
+func OnSuccess(fn func(amqp.Delivery)) Option {
+	return func(listener *Listener) { listener.onSuccess = fn }
+}
+
+// OnError specifies the callback function to execute when the message handler
+// fails with an error, providing the amqp.Delivery and the error returned
+// by the handler itself.
+//
+// If not specified, the Server will call amqp.Delivery.Nack(false, true).
+func OnError(fn func(amqp.Delivery, error)) Option {
+	return func(listener *Listener) { listener.onError = fn }
 }

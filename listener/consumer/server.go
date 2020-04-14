@@ -41,10 +41,19 @@ func (srv server) serve(h handler.Handler) {
 
 // nolint:errcheck
 func (srv server) handleError(delivery amqp.Delivery, err error) {
-	delivery.Nack(false, true)
+	if srv.onError != nil {
+		srv.onError(delivery, err)
+	} else {
+		delivery.Nack(false, true)
+	}
 }
 
 // nolint:errcheck
 func (srv server) handleSuccess(delivery amqp.Delivery) {
-	delivery.Ack(false)
+	if srv.onSuccess != nil {
+		srv.onSuccess(delivery)
+	} else {
+		delivery.Ack(false)
+	}
+
 }
