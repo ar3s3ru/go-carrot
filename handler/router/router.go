@@ -2,11 +2,16 @@ package router
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ar3s3ru/go-carrot/handler"
 
 	"github.com/streadway/amqp"
 )
+
+// ErrNoHandler is returned by Router.Handle method when no handler
+// has been found for the incoming message.
+var ErrNoHandler = errors.New("router: no handler for the incoming message has been found")
 
 // Router is a message handler extension that supports middlewares
 // and multiple consumer bindings.
@@ -37,16 +42,10 @@ type Mux struct {
 func (r Mux) Handle(ctx context.Context, delivery amqp.Delivery) error {
 	handler, ok := r.consumers[delivery.ConsumerTag]
 	if !ok {
-		return delivery.Nack(false, true)
+		return ErrNoHandler
 	}
 
-	err := r.applyMiddlewaresTo(handler).Handle(ctx, delivery)
-	if err != nil {
-		delivery.Nack(false, true)
-		return err
-	}
-
-	return delivery.Ack(false)
+	return r.applyMiddlewaresTo(handler).Handle(ctx, delivery)
 }
 
 // Bind binds a message handler function to the specified queue, if the

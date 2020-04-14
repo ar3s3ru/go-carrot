@@ -43,14 +43,13 @@ func TestListen(t *testing.T) {
 			options: []Option{
 				AutoAck,
 				Exclusive,
-				NoLocal,
 				NoWait,
 			},
 			output: Listener{
 				queue:     "queue",
 				autoAck:   true,
 				exclusive: true,
-				noLocal:   true,
+				noLocal:   false,
 				noWait:    true,
 			},
 		},
