@@ -16,13 +16,17 @@ var ErrNoHandler = errors.New("router: no handler for the incoming message has b
 // Router is a message handler extension that supports middlewares
 // and multiple consumer bindings.
 type Router interface {
+	Binder
 	handler.Handler
 
-	Bind(string, handler.Handler)
-
-	Use(middlewares ...func(handler.Handler) handler.Handler)
-	With(middlewares ...func(handler.Handler) handler.Handler) Router
 	Group(func(Router)) Router
+	Use(middlewares ...func(handler.Handler) handler.Handler)
+	With(middlewares ...func(handler.Handler) handler.Handler) Binder
+}
+
+// Binder allows to bind a queue to a message handler.
+type Binder interface {
+	Bind(string, handler.Handler)
 }
 
 // New returns a new Router instance.
@@ -45,7 +49,7 @@ func (r Mux) Handle(ctx context.Context, delivery amqp.Delivery) error {
 		return ErrNoHandler
 	}
 
-	return r.applyMiddlewaresTo(handler).Handle(ctx, delivery)
+	return applyTo(handler, r.middlewares...).Handle(ctx, delivery)
 }
 
 // Bind binds a message handler function to the specified queue, if the
@@ -67,30 +71,43 @@ func (r *Mux) Use(middlewares ...func(handler.Handler) handler.Handler) {
 	r.middlewares = append(r.middlewares, middlewares...)
 }
 
-// With adds inline middlewares for a message handler, returning the new
-// Router instance with the new middlewares appended to the Mux middleware stack.
-func (r Mux) With(middlewares ...func(handler.Handler) handler.Handler) Router {
-	newRouter := Mux{consumers: r.consumers}
-	newRouter.middlewares = append(r.middlewares, middlewares...)
-
-	return &newRouter
-}
-
 // Group creates a new inline Router and fresh middleware stack, useful to group
 // multiple handler bindings with same middlewares to be applied.
 func (r *Mux) Group(fn func(Router)) Router {
-	newRouter := r.With()
+	newRouter := New()
 
 	if fn != nil {
 		fn(newRouter)
 	}
 
-	return newRouter
+	for consumer := range newRouter.consumers {
+		r.Bind(consumer, newRouter)
+	}
+
+	return r
 }
 
-func (r Mux) applyMiddlewaresTo(handler handler.Handler) handler.Handler {
-	for i := len(r.middlewares) - 1; i >= 0; i-- {
-		middleware := r.middlewares[i]
+// With adds inline middlewares for a message handler, returning a Binder interface
+// that can be used to bind the message handler for a specific consumer.
+func (r *Mux) With(middlewares ...func(handler.Handler) handler.Handler) Binder {
+	return delegatedBinder{
+		router:      r,
+		middlewares: middlewares,
+	}
+}
+
+type delegatedBinder struct {
+	router      *Mux
+	middlewares []func(handler.Handler) handler.Handler
+}
+
+func (b delegatedBinder) Bind(name string, h handler.Handler) {
+	b.router.Bind(name, applyTo(h, b.middlewares...))
+}
+
+func applyTo(handler handler.Handler, middlewares ...func(handler.Handler) handler.Handler) handler.Handler {
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		middleware := middlewares[i]
 		handler = middleware(handler)
 	}
 
