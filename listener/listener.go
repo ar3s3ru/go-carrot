@@ -12,6 +12,8 @@ import (
 // Connection is the connection interface the Listener uses to listen and serve
 // incoming messages.
 type Connection interface {
+	io.Closer
+
 	Channel() (*amqp.Channel, error)
 }
 
