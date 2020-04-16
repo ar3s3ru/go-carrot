@@ -1,6 +1,7 @@
 package listener
 
 import (
+	"context"
 	"io"
 
 	"github.com/ar3s3ru/go-carrot/handler"
@@ -25,7 +26,8 @@ type Channel interface {
 
 // Closer is used to stop listening from a specific Listener.
 type Closer interface {
-	Close() <-chan error
+	Close(context.Context) error
+	Closed() <-chan error
 }
 
 // Listener listens for incoming messages using an amqp.Connection or
