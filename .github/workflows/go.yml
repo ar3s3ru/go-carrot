@@ -30,10 +30,11 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout sources (with HEAD)
+      - name: Checkout sources
         uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+
+      - name: Fetch origin/master
+        run: git fetch --no-tags --prune --depth=1 origin master
 
       - name: Run golangci-lint
         uses: actions-contrib/golangci-lint@v1

@@ -1,6 +1,7 @@
 package carrot
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -27,24 +28,34 @@ var ErrNoListener = errors.New("carrot: no listener specified")
 // Closer allows to close the amqp.Connection provided and
 // any active Listener after Runner.Run has called.
 type Closer struct {
-	conn   *amqp.Connection
+	conn   listener.Connection
 	closer listener.Closer
 }
 
 // Close closes both the amqp.Connection provided and the Listener
 // declared in the Runner.
-func (closer Closer) Close() <-chan error {
+func (closer Closer) Close(ctx context.Context) error {
 	defer closer.conn.Close()
-	return closer.closer.Close()
+	return closer.closer.Close(ctx)
+}
+
+// Closed returns a channel that gets closed when the Listener gets closed.
+//
+// Useful to wait for consumers completion.
+func (closer Closer) Closed() <-chan error {
+	return closer.closer.Closed()
 }
 
 // Runner instruments all the different parts of the go-carrot library,
 // provided with a valid AMQP connection.
 type Runner struct {
-	conn     *amqp.Connection
+	conn     listener.Connection
 	declarer topology.Declarer
 	handler  handler.Handler
 	listener listener.Listener
+
+	shutdown         *Shutdown
+	gracefulShutdown bool
 }
 
 // Run starts all the different parts of the Runner instrumentator,
@@ -78,10 +89,16 @@ func (runner Runner) Run() (Closer, error) {
 		return Closer{}, fmt.Errorf("carrot: failed to listen and serve consumers, %w", err)
 	}
 
-	return Closer{
+	runnerCloser := Closer{
 		conn:   runner.conn,
 		closer: closer,
-	}, nil
+	}
+
+	if runner.gracefulShutdown {
+		go gracefulShutdown(runnerCloser, runner.shutdown.orDefault())
+	}
+
+	return runnerCloser, nil
 }
 
 func (runner Runner) declareTopology() error {
@@ -131,7 +148,7 @@ func (runner Runner) openChannel() (*amqp.Channel, error) {
 // Required options are WithListener, to bind a channel to an amqp.Delivery sink
 // and start receiving messages, and WithHandler, to handle all the incoming
 // messages.
-func From(conn *amqp.Connection, options ...Option) Runner {
+func From(conn listener.Connection, options ...Option) Runner {
 	runner := Runner{conn: conn}
 
 	for _, option := range options {
@@ -163,4 +180,16 @@ func WithHandler(handler handler.Handler) Option {
 // coming from the AMQP broker.
 func WithListener(listener listener.Listener) Option {
 	return func(runner *Runner) { runner.listener = listener }
+}
+
+// WithGracefulShutdown enables graceful shutdown after certain signals
+// are received by the process.
+//
+// Use WithGracefulShutdown(nil) to use the default options, which can be found
+// in DefaultShutdownOptions.
+func WithGracefulShutdown(options *Shutdown) Option {
+	return func(runner *Runner) {
+		runner.shutdown = options
+		runner.gracefulShutdown = true
+	}
 }

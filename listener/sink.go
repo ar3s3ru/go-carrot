@@ -1,11 +1,19 @@
 package listener
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/ar3s3ru/go-carrot/handler"
+
+	"golang.org/x/sync/errgroup"
 )
+
+// ErrSinkAlreadyClosed is returned by listener.Sink when attempting
+// to close the returned Closer more than once.
+var ErrSinkAlreadyClosed = errors.New("listener.Sink: already closed")
 
 // Sink allows for listening from multiple Listeners, by maintaining
 // an amqp.Delivery sink to which all the messages are sent.
@@ -18,6 +26,7 @@ func Sink(listeners ...Listener) Listener {
 
 	sinker := new(sinker)
 	sinker.listeners = listeners
+	sinker.sink = make(chan error, 1)
 
 	return sinker
 }
@@ -28,27 +37,7 @@ type sinker struct {
 	listeners []Listener
 	closers   []Closer
 	sink      chan error
-}
-
-func (sinker *sinker) Close() <-chan error {
-	sinker.Add(len(sinker.closers))
-	sinker.sink = make(chan error, len(sinker.closers))
-
-	go func() {
-		sinker.Wait()
-		close(sinker.sink)
-	}()
-
-	for _, closer := range sinker.closers {
-		go func(closer Closer) {
-			defer sinker.Done()
-
-			err := <-closer.Close()
-			sinker.sink <- err
-		}(closer)
-	}
-
-	return sinker.sink
+	closeOnce sync.Once
 }
 
 func (sinker *sinker) Listen(conn Connection, ch Channel, h handler.Handler) (Closer, error) {
@@ -78,4 +67,28 @@ func (sinker *sinker) collectClosers(conn Connection, ch Channel, h handler.Hand
 	sinker.closers = closers
 
 	return nil
+}
+
+func (sinker *sinker) Close(ctx context.Context) error {
+	err := ErrSinkAlreadyClosed
+
+	sinker.closeOnce.Do(func() {
+		g, ctx := errgroup.WithContext(ctx)
+
+		for _, closer := range sinker.closers {
+			closer := closer
+			g.Go(func() error { return closer.Close(ctx) })
+		}
+
+		err = g.Wait()
+
+		sinker.sink <- err
+		close(sinker.sink)
+	})
+
+	return err
+}
+
+func (sinker *sinker) Closed() <-chan error {
+	return sinker.sink
 }

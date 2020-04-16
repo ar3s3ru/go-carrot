@@ -3,6 +3,9 @@ run:
   modules-download-mode: readonly
 
 linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
   funlen:
     lines: 60
     statements: 40
@@ -21,11 +24,7 @@ linters-settings:
     settings:
       mnd:
         # the list of enabled checks, see https://github.com/tommy-muehle/go-mnd/#checks for description.
-        checks: argument,case,condition,operation,return,assign
-  govet:
-    # report about shadowed variables
-    check-shadowing: true
-    enable-all: true
+        checks: argument,case,condition,operation,return
   lll:
     # max line length, lines longer will be reported. Default is 120.
     # '\t' is counted as 1 character by default, and can be changed with the tab-width option
@@ -53,16 +52,22 @@ linters-settings:
     # XXX: if you enable this setting, unparam will report a lot of false-positives in text editors:
     # if it's called for subdir of a project it can't find external interfaces. All text editor integrations
     # with golangci-lint call it on a directory with the changed file.
-    check-exported: false
+    check-exported: true
   whitespace:
     multi-if: true
     multi-func: true
 
+linters:
+  enable-all: true
+  disable:
+    - gochecknoglobals
+
 issues:
-  # Show only new issues: if there are unstaged changes or untracked files,
-  # only those changes are analyzed, else only changes in HEAD~ are analyzed.
-  # It's a super-useful option for integration of golangci-lint into existing
-  # large codebase. It's not practical to fix all existing issues at the moment
-  # of integration: much better don't allow issues in new code.
-  # Default is false.
-  new: true
+  new-from-rev: origin/master
+  exclude-use-default: false
+
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - funlen  # Some tests might be quite lengthy, especially table-driven tests
+        - gomnd   # "Magic numbers" in tests are allowed

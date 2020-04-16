@@ -51,7 +51,8 @@
 - [x] Consumers router
   - [x] Middleware support
   - [ ] Common middlewares implementation
-- [ ] Graceful shutdown
+- [x] Graceful shutdown
+- [ ] Automatic reconnection
 
 ## Description
 
