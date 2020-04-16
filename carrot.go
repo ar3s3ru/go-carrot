@@ -28,7 +28,7 @@ var ErrNoListener = errors.New("carrot: no listener specified")
 // Closer allows to close the amqp.Connection provided and
 // any active Listener after Runner.Run has called.
 type Closer struct {
-	conn   *amqp.Connection
+	conn   listener.Connection
 	closer listener.Closer
 }
 
@@ -49,7 +49,7 @@ func (closer Closer) Closed() <-chan error {
 // Runner instruments all the different parts of the go-carrot library,
 // provided with a valid AMQP connection.
 type Runner struct {
-	conn     *amqp.Connection
+	conn     listener.Connection
 	declarer topology.Declarer
 	handler  handler.Handler
 	listener listener.Listener
@@ -148,7 +148,7 @@ func (runner Runner) openChannel() (*amqp.Channel, error) {
 // Required options are WithListener, to bind a channel to an amqp.Delivery sink
 // and start receiving messages, and WithHandler, to handle all the incoming
 // messages.
-func From(conn *amqp.Connection, options ...Option) Runner {
+func From(conn listener.Connection, options ...Option) Runner {
 	runner := Runner{conn: conn}
 
 	for _, option := range options {
