@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+// DefaultShutdownOptions are the default Shutdown options used in case
+// no overriding options are specified in WithGracefulShutdown.
 var DefaultShutdownOptions = Shutdown{
 	Timeout: 1 * time.Minute,
 	Signals: []os.Signal{os.Interrupt},
@@ -15,6 +17,10 @@ var DefaultShutdownOptions = Shutdown{
 	},
 }
 
+// Shutdown contains all the different options used by the graceful shutdown
+// component.
+//
+// Default values can be found in DefaultShutdownOptions.
 type Shutdown struct {
 	Timeout time.Duration
 	Signals []os.Signal
@@ -31,9 +37,11 @@ func (shutdown *Shutdown) orDefault() Shutdown {
 	if timeout := shutdown.Timeout; timeout != 0 {
 		options.Timeout = timeout
 	}
+
 	if signals := shutdown.Signals; len(signals) > 0 {
 		options.Signals = signals
 	}
+
 	if onError := shutdown.OnError; onError != nil {
 		options.OnError = onError
 	}
@@ -48,6 +56,7 @@ func gracefulShutdown(closer Closer, options Shutdown) {
 	<-c
 
 	basectx := context.Background()
+
 	ctx, cancel := context.WithTimeout(basectx, options.Timeout)
 	defer cancel()
 

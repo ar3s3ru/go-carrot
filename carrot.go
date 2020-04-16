@@ -182,6 +182,11 @@ func WithListener(listener listener.Listener) Option {
 	return func(runner *Runner) { runner.listener = listener }
 }
 
+// WithGracefulShutdown enables graceful shutdown after certain signals
+// are received by the process.
+//
+// Use WithGracefulShutdown(nil) to use the default options, which can be found
+// in DefaultShutdownOptions.
 func WithGracefulShutdown(options *Shutdown) Option {
 	return func(runner *Runner) {
 		runner.shutdown = options
