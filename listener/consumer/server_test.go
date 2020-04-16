@@ -3,6 +3,7 @@ package consumer_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestListener_Server(t *testing.T) {
@@ -27,7 +29,7 @@ func TestListener_Server(t *testing.T) {
 		)
 
 		sink := make(chan amqp.Delivery)
-		defer close(sink)
+		var sinkCloser sync.Once
 
 		ch := new(mocks.Channel)
 		ch.
@@ -35,6 +37,7 @@ func TestListener_Server(t *testing.T) {
 			Return((<-chan amqp.Delivery)(sink), nil)
 		ch.
 			On("Close").
+			Run(func(args mock.Arguments) { sinkCloser.Do(func() { close(sink) }) }).
 			Return(nil)
 
 		closer, err := listener.Listen(nil, ch, handler.Func(func(context.Context, amqp.Delivery) error {
@@ -44,12 +47,19 @@ func TestListener_Server(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, closer)
 
+		go func() {
+			assert.NoError(t, closer.Close(context.Background()))
+		}()
+
 		select {
-		case err := <-closer.Close():
+		case err := <-closer.Closed():
 			assert.NoError(t, err)
 		case <-time.After(1 * time.Second):
 			assert.Fail(t, "did not finish after 1 second")
 		}
+
+		// Closing a second time will return an error
+		assert.Equal(t, consumer.ErrAlreadyClosed, closer.Close(context.Background()))
 	})
 
 	t.Run("it calls the success callback when the message is being handled correctly", func(t *testing.T) {

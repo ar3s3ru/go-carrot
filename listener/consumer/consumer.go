@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/ar3s3ru/go-carrot/handler"
 	"github.com/ar3s3ru/go-carrot/listener"
@@ -42,7 +43,10 @@ func (l Listener) Listen(conn listener.Connection, ch listener.Channel, h handle
 	l.server.conn = conn
 	l.server.ch = ch
 	l.server.sink = delivery
-	l.server.close = make(chan error)
+	l.server.closeOnce = new(sync.Once)
+	l.server.done = make(chan bool)
+	// Needs buffer, in case user of the library doesn't listen to the close channel.
+	l.server.close = make(chan error, 1)
 
 	go l.serve(h)
 
