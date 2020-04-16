@@ -24,7 +24,7 @@ linters-settings:
     settings:
       mnd:
         # the list of enabled checks, see https://github.com/tommy-muehle/go-mnd/#checks for description.
-        checks: argument,case,condition,operation,return,assign
+        checks: argument,case,condition,operation,return
   lll:
     # max line length, lines longer will be reported. Default is 120.
     # '\t' is counted as 1 character by default, and can be changed with the tab-width option
@@ -63,5 +63,11 @@ linters:
     - gochecknoglobals
 
 issues:
-  exclude-use-default: false
   new-from-rev: origin/master
+  exclude-use-default: false
+
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - funlen  # Some tests might be quite lengthy, especially table-driven tests
+        - gomnd   # "Magic numbers" in tests are allowed

@@ -106,6 +106,7 @@ func TestWithGracefulShutdown(t *testing.T) {
 	).Run()
 
 	assert.NoError(t, err)
+
 	closeCh := closer.Closed()
 
 	for {
@@ -113,7 +114,7 @@ func TestWithGracefulShutdown(t *testing.T) {
 		// Signal more than once to make sure the graceful shutdown goroutine
 		// has been spawned and it's ready to listen to signals.
 		case <-time.Tick(100 * time.Millisecond):
-			syscall.Kill(syscall.Getpid(), syscall.SIGUSR1)
+			assert.NoError(t, syscall.Kill(syscall.Getpid(), syscall.SIGUSR1))
 
 		case err = <-closeCh:
 			assert.NoError(t, err)
@@ -124,5 +125,4 @@ func TestWithGracefulShutdown(t *testing.T) {
 			return
 		}
 	}
-
 }
