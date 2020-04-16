@@ -1,6 +1,7 @@
 package carrot
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -33,9 +34,16 @@ type Closer struct {
 
 // Close closes both the amqp.Connection provided and the Listener
 // declared in the Runner.
-func (closer Closer) Close() <-chan error {
+func (closer Closer) Close(ctx context.Context) error {
 	defer closer.conn.Close()
-	return closer.closer.Close()
+	return closer.closer.Close(ctx)
+}
+
+// Closed returns a channel that gets closed when the Listener gets closed.
+//
+// Useful to wait for consumers completion.
+func (closer Closer) Closed() <-chan error {
+	return closer.closer.Closed()
 }
 
 // Runner instruments all the different parts of the go-carrot library,
@@ -45,6 +53,9 @@ type Runner struct {
 	declarer topology.Declarer
 	handler  handler.Handler
 	listener listener.Listener
+
+	shutdown         *Shutdown
+	gracefulShutdown bool
 }
 
 // Run starts all the different parts of the Runner instrumentator,
@@ -78,10 +89,16 @@ func (runner Runner) Run() (Closer, error) {
 		return Closer{}, fmt.Errorf("carrot: failed to listen and serve consumers, %w", err)
 	}
 
-	return Closer{
+	runnerCloser := Closer{
 		conn:   runner.conn,
 		closer: closer,
-	}, nil
+	}
+
+	if runner.gracefulShutdown {
+		go gracefulShutdown(runnerCloser, runner.shutdown.orDefault())
+	}
+
+	return runnerCloser, nil
 }
 
 func (runner Runner) declareTopology() error {
@@ -163,4 +180,11 @@ func WithHandler(handler handler.Handler) Option {
 // coming from the AMQP broker.
 func WithListener(listener listener.Listener) Option {
 	return func(runner *Runner) { runner.listener = listener }
+}
+
+func WithGracefulShutdown(options *Shutdown) Option {
+	return func(runner *Runner) {
+		runner.shutdown = options
+		runner.gracefulShutdown = true
+	}
 }

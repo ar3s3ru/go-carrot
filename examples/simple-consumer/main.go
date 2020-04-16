@@ -21,6 +21,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// Config is the configuration used by this executable.
 type Config struct {
 	AMQP struct {
 		Addr string `default:"amqp://guest:guest@rabbit:5672"`
@@ -44,6 +45,8 @@ func main() {
 	logger.Println("Starting consumers...")
 
 	closer, err := carrot.From(conn,
+		// Declare the application topology, making sure it matches with the
+		// one present on the AMQP broker. If not, carrot will fail execution.
 		carrot.WithTopology(topology.All(
 			exchange.Declare("messages"),
 			queue.Declare("consumer.message.received",
@@ -54,26 +57,14 @@ func main() {
 				queue.BindTo("messages", "message.deleted"),
 			),
 		)),
+		// Listen for incoming messages on multiple consumers by using listener.Sink.
 		carrot.WithListener(listener.Sink(
-			consumer.Listen(
-				"consumer.message.received",
-				consumer.Title("Message received"),
-			),
-			consumer.Listen(
-				"consumer.message.deleted",
-				consumer.Title("Message deleted"),
-			),
+			consumer.Listen("consumer.message.received"),
+			consumer.Listen("consumer.message.deleted"),
 		)),
-		// carrot.WithListener(listener.Sink(
-		// 	listener.UseDedicatedChannel(consumer.Listen(
-		// 		"consumer.message.received",
-		// 		consumer.Title("Message received"),
-		// 	)),
-		// 	listener.UseDedicatedChannel(consumer.Listen(
-		// 		"consumer.message.deleted",
-		// 		consumer.Title("Message deleted"),
-		// 	)),
-		// )),
+		// Use a Router as message handler function to route messages from both
+		// queues to the appropriate handler function, and add some
+		// middlewares on top of them.
 		carrot.WithHandler(router.New().Group(func(r router.Router) {
 			r.Use(LogMessages(logger))
 			r.Use(middleware.Timeout(50 * time.Millisecond))
@@ -82,18 +73,34 @@ func main() {
 			r.Bind("consumer.message.received", handler.Func(Acknowledger))
 			r.Bind("consumer.message.deleted", handler.Func(Acknowledger))
 		})),
+		// Enables graceful shutdown when an interrupt signal is received.
+		carrot.WithGracefulShutdown(nil),
 	).Run()
 
 	mustNotFail(err, logger)
 
-	select {
-	case <-time.After(config.App.Wait):
-		logger.Printf("Stopping consumer after %s. See ya!\n", time.Since(start))
-	}
+	// Close on the background.
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
 
-	logger.Printf("Stopping consumer after error: %s\n", <-closer.Close())
+		if err := closer.Close(ctx); err != nil {
+			logger.Fatalf("Consumers closed with error: %s", err)
+		}
+
+		logger.Println("Consumers closed successfully")
+	}()
+
+	select {
+	case err := <-closer.Closed():
+		logger.Fatalf("Consumers closed with error: %s", err)
+	case <-time.After(config.App.Wait):
+		logger.Printf("Stopping consumer after %s. See ya!", time.Since(start))
+	}
 }
 
+// SimulateWork simulates some delay between receiving the message and handing
+// the message out to the handler function.
 func SimulateWork(max time.Duration, logger *log.Logger) func(handler.Handler) handler.Handler {
 	return func(next handler.Handler) handler.Handler {
 		return handler.Func(func(ctx context.Context, delivery amqp.Delivery) error {
@@ -107,6 +114,8 @@ func SimulateWork(max time.Duration, logger *log.Logger) func(handler.Handler) h
 	}
 }
 
+// LogMessages logs the incoming message, after being handled by the underlying
+// handler function.
 func LogMessages(logger *log.Logger) func(handler.Handler) handler.Handler {
 	return func(next handler.Handler) handler.Handler {
 		return handler.Func(func(ctx context.Context, delivery amqp.Delivery) error {
@@ -129,9 +138,8 @@ func LogMessages(logger *log.Logger) func(handler.Handler) handler.Handler {
 	}
 }
 
-func Acknowledger(ctx context.Context, delivery amqp.Delivery) error {
-	return nil
-}
+// Acknowledger force message acknowledgement by returning no error.
+func Acknowledger(context.Context, amqp.Delivery) error { return nil }
 
 func mustNotFail(err error, logger *log.Logger) {
 	if err != nil {
