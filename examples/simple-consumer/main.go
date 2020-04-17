@@ -44,7 +44,7 @@ func main() {
 	start := time.Now()
 	logger.Println("Starting consumers...")
 
-	closer, err := carrot.From(conn,
+	closer, err := carrot.Run(conn,
 		// Declare the application topology, making sure it matches with the
 		// one present on the AMQP broker. If not, carrot will fail execution.
 		carrot.WithTopology(topology.All(
@@ -75,7 +75,7 @@ func main() {
 		})),
 		// Enables graceful shutdown when an interrupt signal is received.
 		carrot.WithGracefulShutdown(nil),
-	).Run()
+	)
 
 	mustNotFail(err, logger)
 
