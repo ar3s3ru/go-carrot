@@ -105,7 +105,7 @@ if err != nil {
 
 // The carrot.Closer handle returned is useless if only topology declaration
 // is used.
-_, err := carrot.From(conn,
+_, err := carrot.Run(conn,
     // Declare your topology here
     carrot.WithTopology(topology.All(
         // topology.All is used to declare more than one topology
@@ -118,7 +118,7 @@ _, err := carrot.From(conn,
             queue.BindTo("messages", "message.deleted"),
         ),
     )),
-).Run()
+)
 ```
 
 ### Message handlers
@@ -221,7 +221,7 @@ if err != nil {
     panic(err)
 }
 
-closer, err := carrot.From(conn,
+closer, err := carrot.Run(conn,
     // First, declare your topology...
     carrot.WithTopology(topology.All(
         exchange.Declare("messages"),
@@ -249,9 +249,7 @@ closer, err := carrot.From(conn,
         r.Bind("consumer.message.received", handler.Func(Acknowledger))
         r.Bind("consumer.message.deleted", handler.Func(Acknowledger))
     })),
-).
-// ...and start listening to messages!
-Run()
+)
 
 if err != nil {
     panic(err)

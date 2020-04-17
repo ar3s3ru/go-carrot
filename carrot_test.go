@@ -79,7 +79,7 @@ func TestWithGracefulShutdown(t *testing.T) {
 
 	ch := make(chan error)
 
-	closer, err := carrot.From(conn,
+	closer, err := carrot.Run(conn,
 		carrot.WithListener(
 			listener.Func(func(listener.Connection, listener.Channel, handler.Handler) (listener.Closer, error) {
 				closer := new(mocks.Closer)
@@ -103,7 +103,7 @@ func TestWithGracefulShutdown(t *testing.T) {
 			// to SIGNINT and that would make the test fail.
 			Signals: []os.Signal{syscall.SIGUSR1},
 		}),
-	).Run()
+	)
 
 	assert.NoError(t, err)
 

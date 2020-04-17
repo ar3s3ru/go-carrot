@@ -143,6 +143,13 @@ func (runner Runner) openChannel() (*amqp.Channel, error) {
 	return ch, nil
 }
 
+// Run is a convenience method to run a new Runner instance directly.
+//
+// It is the equivalent of carrot.From(...).Run()
+func Run(conn listener.Connection, options ...Option) (Closer, error) {
+	return From(conn, options...).Run()
+}
+
 // From creates a new Runner instance, given an AMQP connection and options.
 //
 // Required options are WithListener, to bind a channel to an amqp.Delivery sink
